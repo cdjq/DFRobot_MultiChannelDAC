@@ -1,0 +1,35 @@
+#######################################
+# Syntax Coloring Map For DFRobot_MultiChannelDAC
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+DFRobot_MultiChannelDAC	KEYWORD1
+eOutputRange_t	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+begin	KEYWORD2
+setOutputRange	KEYWORD2
+setAllOutputRange	KEYWORD2
+setVoltage	KEYWORD2
+setSyncVoltages	KEYWORD2
+setAllVoltage	KEYWORD2
+setChannelEnabled	KEYWORD2
+stopOutput	KEYWORD2
+readFirmwareVersion	KEYWORD2
+getSKU	KEYWORD2
+getChannelCount	KEYWORD2
+getVoltage	KEYWORD2
+getRange	KEYWORD2
+getChannelEnabled	KEYWORD2
+getStatus	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+eOutputRange2_5V	LITERAL1
+eOutputRange5V	LITERAL1
+eOutputRange10V	LITERAL1

@@ -35,9 +35,11 @@ void setup() {
     return;
   }
 
+  /* 按当前量程均分：4 路 5 V 为 1.25～5 V，8 路 5 V 为 0.625～5 V，10 V 板同理到满量程。 */
+  const float fullScale = (range == eOutputRange10V) ? 10.0f : 5.0f;
   float voltages[DFR_MCDAC_MAX_CHANNELS] = {0};
   for (uint8_t ch = 0; ch < channels; ++ch) {
-    voltages[ch] = 1.0f + (float)ch; /* CH0=1.0 V, CH1=2.0 V, ... */
+    voltages[ch] = fullScale * (float)(ch + 1) / (float)channels;
   }
   ret = dac.setAllVoltage(voltages, channels);
   if (ret != 0) {

@@ -4,7 +4,7 @@
  *
  * @copyright   Copyright (c) 2026 DFRobot Co.Ltd (http://www.dfrobot.com)
  * @licence     The MIT License (MIT)
- * @author      DFRobot (github@dfrobot.com)
+ * @author      wxzed (xiao.wu@dfrobot.com)
  * @version     V1.0.0
  * @date        2026-11-16
  * @url         https://github.com/DFRobot/DFRobot_MultiChannelDAC

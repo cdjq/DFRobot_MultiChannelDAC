@@ -1,10 +1,11 @@
 /*!
  * @file DFRobot_MultiChannelDAC.h
  * @brief DFRobot MultiChannel DAC Arduino library for DFR1328/DFR1329/DFR1332/DFR1333.
+ * @details 通过 General RTU 产品寄存器访问模块：I2C 用 TwoWire 访问 0x40～0x43，UART/USB CDC 用 Stream；同一套 API 覆盖 4 通道和 8 通道、0～10 V 与 0～2.5 V/0～5 V 四种模块。
  *
  * @copyright   Copyright (c) 2026 DFRobot Co.Ltd (http://www.dfrobot.com)
  * @licence     The MIT License (MIT)
- * @author      DFRobot (github@dfrobot.com)
+ * @author      wxzed (xiao.wu@dfrobot.com)
  * @version     V1.0.0
  * @date        2026-11-16
  * @url         https://github.com/DFRobot/DFRobot_MultiChannelDAC
@@ -86,14 +87,17 @@ public:
   /**
    * @brief 初始化模块，读取板型、通道数和固件版本。
    * @return 0 表示成功；非 0 表示探测失败、VID/PID 不符或板型不支持。
-   * @n 初始化后全部通道输出 0 V；DFR1328/DFR1329 默认量程 0～10 V，DFR1332/DFR1333 默认 0～5 V。
+   * @n 不改变通道输出和量程；模块上电后默认全部通道 0 V，DFR1328/DFR1329 默认量程 0～10 V，DFR1332/DFR1333 默认 0～5 V。
    */
   int begin(void);
 
   /**
    * @brief 设置一个通道的输出量程。
    * @param channel 通道编号，0～3 或 0～7，与 PCB 丝印 CH0～CH3 / CH0～CH7 一致。
-   * @param range 量程：eOutputRange2_5V、eOutputRange5V、eOutputRange10V；只有板型支持的档位才有效。
+   * @param range 量程，只有板型支持的档位才有效。
+   * - eOutputRange2_5V：0～2.5 V，仅 DFR1332/DFR1333。
+   * - eOutputRange5V：0～5 V，仅 DFR1332/DFR1333。
+   * - eOutputRange10V：0～10 V，仅 DFR1328/DFR1329。
    * @return 0 表示成功；非 0 表示通道、量程非法或通信失败。
    * @n 修改量程时该通道先输出 0 V，切换后保持 0 V；目标电压同时清 0。
    */
@@ -101,7 +105,10 @@ public:
 
   /**
    * @brief 把全部通道设置为同一量程。
-   * @param range 量程：eOutputRange2_5V、eOutputRange5V、eOutputRange10V；只有板型支持的档位才有效。
+   * @param range 量程，只有板型支持的档位才有效。
+   * - eOutputRange2_5V：0～2.5 V，仅 DFR1332/DFR1333。
+   * - eOutputRange5V：0～5 V，仅 DFR1332/DFR1333。
+   * - eOutputRange10V：0～10 V，仅 DFR1328/DFR1329。
    * @return 0 表示成功；非 0 表示量程非法或通信失败。
    * @n 调用时全部通道先同步回 0 V，再完成量程切换。
    */
@@ -203,7 +210,7 @@ public:
    */
   uint16_t getStatus(void);
 
-private:
+protected:
   int readInputRegister16(uint16_t reg, uint16_t *value);
   int readHoldingRegister16(uint16_t reg, uint16_t *value);
   int writeHoldingRegister16(uint16_t reg, uint16_t value);
@@ -215,6 +222,7 @@ private:
   uint16_t rangeMaxMv(uint8_t range) const;
   uint16_t pidForSku(uint8_t sku) const;
 
+private:
   TwoWire *_wire;
   Stream *_serial;
   bool _isI2C;

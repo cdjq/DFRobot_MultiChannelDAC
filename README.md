@@ -1,8 +1,25 @@
 # DFRobot_MultiChannelDAC
 
-A 4/8-channel synchronous voltage-output DAC module library for DFR1328, DFR1329, DFR1332 and DFR1333.
+[中文版](README_CN.md)
 
-## Introduction
+## Product Link
+
+- [DFRobot_MultiChannelDAC](https://github.com/DFRobot/DFRobot_MultiChannelDAC)
+
+## Table of Contents
+
+- [Product Link](#product-link)
+- [Table of Contents](#table-of-contents)
+- [Summary](#summary)
+- [Installation](#installation)
+- [Methods](#methods)
+- [Compatibility](#compatibility)
+- [History](#history)
+- [Credits](#credits)
+
+## Summary
+
+A 4/8-channel synchronous voltage-output DAC module library for DFR1328, DFR1329, DFR1332 and DFR1333.
 
 The DFRobot MultiChannel DAC modules use an on-board RP2040 to drive a DAC80504 or DAC80508 over SPI. The host MCU does not touch the DAC directly: it reads and writes a General RTU register table over I2C, UART or USB CDC.
 
@@ -13,9 +30,19 @@ The DFRobot MultiChannel DAC modules use an on-board RP2040 to drive a DAC80504 
 
 Each channel can be set independently, enabled or disabled, and updated alone. Several channels or all channels can be updated synchronously with one commit.
 
-## Connection
+After uploading `setSingleChannelVoltage` to the host board, open the serial port at 115200 8N1:
 
-### I2C
+```
+DFRobot MultiChannel DAC - single channel
+firmware version: 0x…
+board SKU: …
+channel count: …
+CH0 voltage: … V
+```
+
+### Connection
+
+#### I2C
 
 | Module | Host |
 |--------|------|
@@ -28,7 +55,7 @@ The I2C address is selected by ADDR0/ADDR1 and is 0x40–0x43. With the factory 
 
 Set the I2C/UART switch to **I2C** (GPIO4 high, the factory default).
 
-### UART
+#### UART
 
 | Module | Host |
 |--------|------|
@@ -41,14 +68,22 @@ The factory UART setting is 9600 baud, no parity, 2 stop bits (8N2), General RTU
 
 Set the I2C/UART switch to **UART** (GPIO4 low).
 
-### USB CDC
+#### USB CDC
 
 Connect the module USB port to the host. The USB CDC port uses the same General RTU frames and the same slave address. The host does not need to match a baud rate.
 
-## API
+## Installation
+
+- Search `DFRobot_MultiChannelDAC` in the Arduino Library Manager and install it.
+- Or download the library ZIP and unzip it into the `libraries` folder of the Arduino IDE.
+
+The library depends on `DFRobot_RTU`; install it the same way.
+
+## Methods
 
 ```cpp
 /**
+ * @fn DFRobot_MultiChannelDAC
  * @brief I2C constructor. begin() scans 0x40–0x43.
  * @param wire Wire object, defaults to &Wire.
  * @n I2C address is set by ADDR0/ADDR1; factory pull-ups make it 0x43.
@@ -56,6 +91,7 @@ Connect the module USB port to the host. The USB CDC port uses the same General 
 DFRobot_MultiChannelDAC(TwoWire *wire = &Wire);
 
 /**
+ * @fn DFRobot_MultiChannelDAC
  * @brief UART/USB CDC constructor using DFRobot General RTU.
  * @param serial Opened Stream, for example &Serial1 or &Serial.
  * @n Factory UART is 9600 8N2, slave address 0x0F. USB CDC ignores baud rate.
@@ -63,30 +99,40 @@ DFRobot_MultiChannelDAC(TwoWire *wire = &Wire);
 DFRobot_MultiChannelDAC(Stream *serial);
 
 /**
+ * @fn begin
  * @brief Initialize the module and read board type, channel count and firmware version.
  * @return 0 on success; non-zero on probe, VID/PID or board-type failure.
- * @n All channels output 0 V after init. Default range is 0–10 V on DFR1328/DFR1329 and 0–5 V on DFR1332/DFR1333.
+ * @n Output and range are unchanged by begin(). All channels are 0 V after the module powers up. Default range is 0–10 V on DFR1328/DFR1329 and 0–5 V on DFR1332/DFR1333.
  */
 int begin(void);
 
 /**
+ * @fn setOutputRange
  * @brief Set the output range of one channel.
  * @param channel Channel number, 0–3 or 0–7, matching PCB silkscreen CH0–CH3.
- * @param range eOutputRange2_5V, eOutputRange5V or eOutputRange10V; only ranges supported by the board are valid.
+ * @param range Output range; only ranges supported by the board are valid.
+ * - eOutputRange2_5V: 0–2.5 V, DFR1332/DFR1333 only.
+ * - eOutputRange5V: 0–5 V, DFR1332/DFR1333 only.
+ * - eOutputRange10V: 0–10 V, DFR1328/DFR1329 only.
  * @return 0 on success; non-zero on illegal channel/range or communication failure.
  * @n The channel first outputs 0 V, then switches range and stays at 0 V. The target voltage is cleared.
  */
 int setOutputRange(uint8_t channel, eOutputRange_t range);
 
 /**
+ * @fn setAllOutputRange
  * @brief Set all channels to the same output range.
- * @param range eOutputRange2_5V, eOutputRange5V or eOutputRange10V; only ranges supported by the board are valid.
+ * @param range Output range; only ranges supported by the board are valid.
+ * - eOutputRange2_5V: 0–2.5 V, DFR1332/DFR1333 only.
+ * - eOutputRange5V: 0–5 V, DFR1332/DFR1333 only.
+ * - eOutputRange10V: 0–10 V, DFR1328/DFR1329 only.
  * @return 0 on success; non-zero on illegal range or communication failure.
  * @n All channels first return to 0 V, then switch range together.
  */
 int setAllOutputRange(eOutputRange_t range);
 
 /**
+ * @fn setVoltage
  * @brief Set one channel voltage and update it immediately.
  * @param channel Channel number, 0–3 or 0–7, matching PCB silkscreen CH0–CH3.
  * @param voltage Output voltage in V, limited by the current range of that channel.
@@ -96,6 +142,7 @@ int setAllOutputRange(eOutputRange_t range);
 int setVoltage(uint8_t channel, float voltage);
 
 /**
+ * @fn setSyncVoltages
  * @brief Set several channels and update them synchronously.
  * @param channels Channel array with numbers 0–3 or 0–7; duplicates are rejected.
  * @param voltages Voltage array in V, matching channels one by one.
@@ -106,6 +153,7 @@ int setVoltage(uint8_t channel, float voltage);
 int setSyncVoltages(const uint8_t channels[], const float voltages[], uint8_t length);
 
 /**
+ * @fn setAllVoltage
  * @brief Set all channels and update them synchronously.
  * @param voltage Voltage array in V, ordered CH0, CH1, ...
  * @param length Array length: 4 for a 4-channel module, 8 for an 8-channel module.
@@ -115,6 +163,7 @@ int setSyncVoltages(const uint8_t channels[], const float voltages[], uint8_t le
 int setAllVoltage(const float voltage[], uint8_t length);
 
 /**
+ * @fn setChannelEnabled
  * @brief Enable or disable one channel.
  * @param channel Channel number, 0–3 or 0–7, matching PCB silkscreen CH0–CH3.
  * @param enabled true to enable, false to disable.
@@ -124,6 +173,7 @@ int setAllVoltage(const float voltage[], uint8_t length);
 int setChannelEnabled(uint8_t channel, bool enabled);
 
 /**
+ * @fn stopOutput
  * @brief Set all channels to 0 V synchronously.
  * @return 0 on success; non-zero on communication failure.
  * @n Range and enable state are unchanged. A later setVoltage() or setAllVoltage() restores output.
@@ -131,6 +181,7 @@ int setChannelEnabled(uint8_t channel, bool enabled);
 int stopOutput(void);
 
 /**
+ * @fn readFirmwareVersion
  * @brief Read the firmware version.
  * @return Firmware version, for example 0x1000 for V1.0.0.0; 0 on read failure.
  * @n The value comes from input register 0x0003; there is no active report.
@@ -138,6 +189,7 @@ int stopOutput(void);
 uint16_t readFirmwareVersion(void);
 
 /**
+ * @fn getSKU
  * @brief Read the board type.
  * @return 0=DFR1328, 1=DFR1329, 2=DFR1332, 3=DFR1333; 0xFF on read failure.
  * @n Board type comes from the SKU pins; current hardware returns 0 when the pins are not implemented.
@@ -145,6 +197,7 @@ uint16_t readFirmwareVersion(void);
 uint8_t getSKU(void);
 
 /**
+ * @fn getChannelCount
  * @brief Read the output channel count.
  * @return 4 or 8; 0 before begin().
  * @n Cached from input register 0x0005 read by begin().
@@ -152,6 +205,7 @@ uint8_t getSKU(void);
 uint8_t getChannelCount(void);
 
 /**
+ * @fn getVoltage
  * @brief Read the applied voltage of one channel.
  * @param channel Channel number, 0–3 or 0–7.
  * @return Voltage in V; 0 for an illegal channel or read failure.
@@ -160,6 +214,7 @@ uint8_t getChannelCount(void);
 float getVoltage(uint8_t channel);
 
 /**
+ * @fn getRange
  * @brief Read the current range of one channel.
  * @param channel Channel number, 0–3 or 0–7.
  * @return Range enum; eOutputRange10V for an illegal channel or read failure.
@@ -168,6 +223,7 @@ float getVoltage(uint8_t channel);
 eOutputRange_t getRange(uint8_t channel);
 
 /**
+ * @fn getChannelEnabled
  * @brief Read the enable state of one channel.
  * @param channel Channel number, 0–3 or 0–7.
  * @return true if enabled, false if disabled or read failed.
@@ -176,6 +232,7 @@ eOutputRange_t getRange(uint8_t channel);
 bool getChannelEnabled(uint8_t channel);
 
 /**
+ * @fn getStatus
  * @brief Read the module status.
  * @return Status bitmap, bit0=1 means DAC reference alarm; 0 on read failure.
  * @n The value comes from input register 0x0006.
@@ -185,7 +242,7 @@ uint16_t getStatus(void);
 
 Channel numbers start at 0 and match the PCB silkscreen CH0–CH3 / CH0–CH7. `setSyncVoltages()` takes the channel array and its length, for example `{0, 1, 2}` with `length = 3`.
 
-## Examples
+### Examples
 
 - `setSingleChannelVoltage`: initialize, read board type, set CH0 range and voltage, read it back.
 - `setSyncChannelsVoltage`: update several channels synchronously.
@@ -194,14 +251,17 @@ Channel numbers start at 0 and match the PCB silkscreen CH0–CH3 / CH0–CH7. `
 
 ## Compatibility
 
-- MCU: AVR, ESP32, RP2040 and other Arduino-compatible boards with `Wire` or `Stream`.
-- Module firmware: DFRobot General RTU 2.0.
-- Library dependency: `DFRobot_RTU`.
+| MCU | Work Well | Work Wrong | Untested | Remarks |
+|-----|-----------|------------|----------|---------|
+| Arduino UNO | | | √ | |
+| Arduino MEGA 2560 | | | √ | |
+| ESP32 | | | √ | |
+| Raspberry Pi Pico (RP2040) | | | √ | |
 
 ## History
 
-- 2026/11/16 - V1.0.0: first release for DFR1328/DFR1329/DFR1332/DFR1333.
+- 2026/11/16 - V1.0.0 version
 
 ## Credits
 
-Written by DFRobot (github@dfrobot.com).
+Written by wxzed (xiao.wu@dfrobot.com), 2026. [DFRobot](https://www.dfrobot.com)

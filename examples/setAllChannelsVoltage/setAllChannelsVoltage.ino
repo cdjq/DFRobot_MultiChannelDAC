@@ -1,11 +1,15 @@
 /*!
  * @file setAllChannelsVoltage.ino
  * @brief Set all DAC channels at once and update them synchronously.
+ * @n Wire the module to the host over I2C: SDA to SDA, SCL to SCL, GND to GND, VCC to 3.3 V or 5 V,
+ * @n then set the module switch to I2C. A multimeter on CH0～CH7 shows each channel output.
+ * @n The serial port prints one line per channel, for example CH0 = … V, CH1 = … V.
  * @copyright   Copyright (c) 2026 DFRobot Co.Ltd (http://www.dfrobot.com)
  * @licence     The MIT License (MIT)
- * @author      DFRobot (github@dfrobot.com)
+ * @author      wxzed (xiao.wu@dfrobot.com)
  * @version     V1.0.0
  * @date        2026-11-16
+ * @url https://github.com/DFRobot/DFRobot_MultiChannelDAC
  */
 #include <Wire.h>
 #include <DFRobot_MultiChannelDAC.h>

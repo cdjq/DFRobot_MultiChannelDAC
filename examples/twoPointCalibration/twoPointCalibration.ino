@@ -1,14 +1,17 @@
 /*!
  * @file twoPointCalibration.ino
  * @brief Two-point calibration example for one DAC channel.
- * @n Connect a multimeter to CH0. The sketch outputs 10 % and 90 % of the
- * @n selected range, asks for the measured values, then applies the slope and
- * @n offset to later voltage settings.
+ * @n Wire the module to the host over I2C: SDA to SDA, SCL to SCL, GND to GND, VCC to 3.3 V or 5 V,
+ * @n then set the module switch to I2C. Connect a multimeter to CH0. The sketch outputs 10 % and 90 % of
+ * @n the selected range, asks for the measured values, then applies the slope and offset to later voltage settings.
+ * @n The serial port asks for each measured voltage in V, then prints "slope = …" and "offset = …",
+ * @n followed by one line per test point, for example "target … V -> command … V, readback … V".
  * @copyright   Copyright (c) 2026 DFRobot Co.Ltd (http://www.dfrobot.com)
  * @licence     The MIT License (MIT)
- * @author      DFRobot (github@dfrobot.com)
+ * @author      wxzed (xiao.wu@dfrobot.com)
  * @version     V1.0.0
  * @date        2026-11-16
+ * @url https://github.com/DFRobot/DFRobot_MultiChannelDAC
  */
 #include <Wire.h>
 #include <DFRobot_MultiChannelDAC.h>

@@ -1,13 +1,17 @@
 /*!
  * @file setSingleChannelVoltage.ino
  * @brief Set one DAC channel and read it back.
+ * @n Wire the module to the host over I2C: SDA to SDA, SCL to SCL, GND to GND, VCC to 3.3 V or 5 V,
+ * @n then set the module switch to I2C. A multimeter on CH0 shows the output.
+ * @n The serial port prints the firmware version, the board SKU, the channel count and CH0 voltage.
  * @n This is the main example: it initializes the module, reads the board type,
  * @n selects a valid range, sets CH0 voltage and reads the applied value back.
  * @copyright   Copyright (c) 2026 DFRobot Co.Ltd (http://www.dfrobot.com)
  * @licence     The MIT License (MIT)
- * @author      DFRobot (github@dfrobot.com)
+ * @author      wxzed (xiao.wu@dfrobot.com)
  * @version     V1.0.0
  * @date        2026-11-16
+ * @url https://github.com/DFRobot/DFRobot_MultiChannelDAC
  */
 #include <Wire.h>
 #include <DFRobot_MultiChannelDAC.h>

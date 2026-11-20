@@ -7,6 +7,7 @@
 #######################################
 DFRobot_MultiChannelDAC	KEYWORD1
 eOutputRange_t	KEYWORD1
+eWaveform_t	KEYWORD1
 
 #######################################
 # Methods and Functions (KEYWORD2)
@@ -19,6 +20,10 @@ setSyncVoltages	KEYWORD2
 setAllVoltage	KEYWORD2
 setChannelEnabled	KEYWORD2
 stopOutput	KEYWORD2
+setWaveform	KEYWORD2
+writeCustomWave	KEYWORD2
+startWaveform	KEYWORD2
+stopWaveform	KEYWORD2
 readFirmwareVersion	KEYWORD2
 getSKU	KEYWORD2
 getChannelCount	KEYWORD2
@@ -33,3 +38,9 @@ getStatus	KEYWORD2
 eOutputRange2_5V	LITERAL1
 eOutputRange5V	LITERAL1
 eOutputRange10V	LITERAL1
+eWaveformDc	LITERAL1
+eWaveformSine	LITERAL1
+eWaveformSquare	LITERAL1
+eWaveformTriangle	LITERAL1
+eWaveformSawtooth	LITERAL1
+eWaveformCustom	LITERAL1

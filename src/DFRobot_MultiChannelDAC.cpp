@@ -5,8 +5,8 @@
  * @copyright   Copyright (c) 2026 DFRobot Co.Ltd (http://www.dfrobot.com)
  * @licence     The MIT License (MIT)
  * @author      wxzed (xiao.wu@dfrobot.com)
- * @version     V1.0.0
- * @date        2026-11-16
+ * @version     V1.1.0
+ * @date        2026-11-20
  * @url         https://github.com/DFRobot/DFRobot_MultiChannelDAC
  */
 #include "DFRobot_MultiChannelDAC.h"
@@ -111,10 +111,10 @@ int DFRobot_MultiChannelDAC::writeRegisterBlock(uint16_t reg, const uint16_t *va
     }
     return (_wire->endTransmission() == 0) ? 0 : -2;
   }
-  if (_serial == nullptr || count > DFR_MCDAC_MAX_CHANNELS) {
+  if (_serial == nullptr || count > DFR_MCDAC_RTU_WRITE_MAX) {
     return -3;
   }
-  uint16_t buffer[DFR_MCDAC_MAX_CHANNELS];
+  uint16_t buffer[DFR_MCDAC_RTU_WRITE_MAX];
   for (uint8_t i = 0; i < count; ++i) {
     buffer[i] = values[i];
   }
@@ -382,6 +382,148 @@ int DFRobot_MultiChannelDAC::setChannelEnabled(uint8_t channel, bool enabled) {
 
 int DFRobot_MultiChannelDAC::stopOutput(void) {
   return writeHoldingRegister16(DFR_MCDAC_HOLDING_COMMAND, DFR_MCDAC_CMD_STOP_ALL);
+}
+
+int DFRobot_MultiChannelDAC::waveformMask(const uint8_t channels[], uint8_t length,
+                                          uint16_t *mask) const {
+  if (_channels == 0 || channels == nullptr || mask == nullptr) {
+    return -1;
+  }
+  if (length == 0 || length > _channels) {
+    return -2;
+  }
+  uint16_t bits = 0;
+  for (uint8_t i = 0; i < length; ++i) {
+    if (channels[i] >= _channels) {
+      return -3;
+    }
+    const uint16_t bit = static_cast<uint16_t>(1u << channels[i]);
+    if ((bits & bit) != 0) {
+      return -4;
+    }
+    bits = static_cast<uint16_t>(bits | bit);
+  }
+  *mask = bits;
+  return 0;
+}
+
+int DFRobot_MultiChannelDAC::waveformCommand(uint16_t command, const uint8_t channels[],
+                                             uint8_t length) {
+  uint16_t mask = 0;
+  const int built = waveformMask(channels, length, &mask);
+  if (built != 0) {
+    return built;
+  }
+  const uint16_t frame[2] = {command, mask};
+  return writeRegisterBlock(DFR_MCDAC_HOLDING_WAVE_COMMAND, frame, 2);
+}
+
+int DFRobot_MultiChannelDAC::setWaveform(uint8_t channel, eWaveform_t type, float freqHz,
+                                         float amplitude, float offset, float dutyPercent,
+                                         float phaseDeg) {
+  if (_channels == 0 || channel >= _channels) {
+    return -1;
+  }
+  if (static_cast<uint8_t>(type) > eWaveformCustom) {
+    return -2;
+  }
+  if (!(freqHz >= 0.0f) || freqHz > static_cast<float>(DFR_MCDAC_WAVE_FREQ_MAX_HZ)) {
+    return -3;
+  }
+  if (!(amplitude >= 0.0f) || amplitude > 10.0f || !(offset >= 0.0f) || offset > 10.0f ||
+      !(dutyPercent >= 0.0f) || dutyPercent > 100.0f || !(phaseDeg >= 0.0f) ||
+      phaseDeg > 360.0f) {
+    return -4;
+  }
+  const long amplitudeMv = static_cast<long>(amplitude * 1000.0f + 0.5f);
+  const long offsetMv = static_cast<long>(offset * 1000.0f + 0.5f);
+  const uint16_t full = rangeMaxMv(_range[channel]);
+  if (amplitudeMv < 0 || offsetMv < 0 || amplitudeMv > full || offsetMv > full) {
+    return -5;
+  }
+  if (type != eWaveformDc &&
+      (offsetMv < amplitudeMv || static_cast<uint32_t>(offsetMv) + static_cast<uint32_t>(amplitudeMv) > full)) {
+    return -5;
+  }
+  const uint32_t freqMilli = static_cast<uint32_t>(static_cast<double>(freqHz) * 1000.0 + 0.5);
+  if (freqMilli > static_cast<uint32_t>(DFR_MCDAC_WAVE_FREQ_MAX_HZ) * 1000u) {
+    return -3;
+  }
+  const long duty = static_cast<long>(dutyPercent * 10.0f + 0.5f);
+  if (duty < 0 || duty > 1000) {
+    return -4;
+  }
+  uint16_t phase = 65535;
+  if (phaseDeg < 360.0f) {
+    phase = static_cast<uint16_t>(static_cast<double>(phaseDeg) / 360.0 * 65535.0 + 0.5);
+  }
+  const uint16_t frame[8] = {
+      channel,
+      static_cast<uint16_t>(type),
+      static_cast<uint16_t>(freqMilli & 0xFFFFu),
+      static_cast<uint16_t>(freqMilli >> 16),
+      static_cast<uint16_t>(amplitudeMv),
+      static_cast<uint16_t>(offsetMv),
+      static_cast<uint16_t>(duty),
+      phase,
+  };
+  return writeRegisterBlock(DFR_MCDAC_HOLDING_WAVE_CHANNEL, frame, 8);
+}
+
+int DFRobot_MultiChannelDAC::writeCustomWave(uint8_t channel,
+                                             const uint16_t samples[DFR_MCDAC_WAVE_POINTS]) {
+  if (_channels == 0 || channel >= _channels) {
+    return -1;
+  }
+  if (samples == nullptr) {
+    return -2;
+  }
+  for (uint8_t block = 0; block < 16; ++block) {
+    const uint16_t *chunk = samples + static_cast<uint16_t>(block) * 16u;
+    const uint16_t blockWord = static_cast<uint16_t>((static_cast<uint16_t>(channel) << 12) | block);
+    if (_isI2C) {
+      const int header = writeHoldingRegister16(DFR_MCDAC_HOLDING_WAVE_BLOCK, blockWord);
+      if (header != 0) {
+        return header;
+      }
+      const int first = writeRegisterBlock(DFR_MCDAC_HOLDING_WAVE_DATA, chunk, 8);
+      if (first != 0) {
+        return first;
+      }
+      const int second = writeRegisterBlock(
+          static_cast<uint16_t>(DFR_MCDAC_HOLDING_WAVE_DATA + 8), chunk + 8, 8);
+      if (second != 0) {
+        return second;
+      }
+    } else {
+      uint16_t frame[DFR_MCDAC_RTU_WRITE_MAX];
+      frame[0] = blockWord;
+      for (uint8_t i = 0; i < 16; ++i) {
+        frame[i + 1] = chunk[i];
+      }
+      const int result = writeRegisterBlock(DFR_MCDAC_HOLDING_WAVE_BLOCK, frame, DFR_MCDAC_RTU_WRITE_MAX);
+      if (result != 0) {
+        return result;
+      }
+    }
+  }
+  return 0;
+}
+
+int DFRobot_MultiChannelDAC::startWaveform(const uint8_t channels[], uint8_t length) {
+  return waveformCommand(DFR_MCDAC_WAVE_CMD_START, channels, length);
+}
+
+int DFRobot_MultiChannelDAC::startWaveform(uint8_t channel) {
+  return startWaveform(&channel, 1);
+}
+
+int DFRobot_MultiChannelDAC::stopWaveform(const uint8_t channels[], uint8_t length) {
+  return waveformCommand(DFR_MCDAC_WAVE_CMD_STOP, channels, length);
+}
+
+int DFRobot_MultiChannelDAC::stopWaveform(uint8_t channel) {
+  return stopWaveform(&channel, 1);
 }
 
 uint16_t DFRobot_MultiChannelDAC::readFirmwareVersion(void) {

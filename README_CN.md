@@ -28,7 +28,7 @@ DFRobot 多通道 DAC 模块板载 RP2040，通过 SPI 驱动 DAC80504 或 DAC80
 - DFR1332：4 通道，0～2.5 V / 0～5 V
 - DFR1333：8 通道，0～2.5 V / 0～5 V
 
-每个通道可以独立设置、独立启用或停用，也可以单独更新；多个通道或全部通道可以用一次提交同步生效。
+每个通道可以独立设置、独立启用或停用，也可以单独更新；多个通道或全部通道可以用一次提交同步生效。每路还可以输出正弦、方波、三角、锯齿或 256 点自定义波形，频率最高 5000 Hz。
 
 烧录 `setSingleChannelVoltage` 后，用 115200 8N1 打开串口会看到：
 
@@ -174,11 +174,64 @@ int setChannelEnabled(uint8_t channel, bool enabled);
 
 /**
  * @fn stopOutput
- * @brief 将全部通道同步设置为 0 V。
+ * @brief 将全部通道同步设置为 0 V，并停止全部波形。
  * @return 0 表示成功；非 0 表示通信失败。
  * @n 不改变量程和通道启用状态；后续调用 setVoltage() 或 setAllVoltage() 即可恢复输出。
  */
 int stopOutput(void);
+
+/**
+ * @fn setWaveform
+ * @brief 写入一路波形参数，不启动播放。
+ * @param channel 通道编号，0～3 或 0～7，与 PCB 丝印一致。
+ * @param type 波形类型。
+ * - eWaveformDc：直流，输出等于偏置。
+ * - eWaveformSine：正弦。
+ * - eWaveformSquare：方波，占空比有效。
+ * - eWaveformTriangle：三角。
+ * - eWaveformSawtooth：锯齿。
+ * - eWaveformCustom：自定义，使用 writeCustomWave() 写入的 256 点。
+ * @param freqHz 频率，单位 Hz，0～5000。0 表示停在当前相位。
+ * @param amplitude 峰值幅度，单位 V。输出范围是偏置减幅度到偏置加幅度，必须落在当前量程内。
+ * @param offset 偏置，单位 V。
+ * @param dutyPercent 方波占空比，0～100，其他波形忽略。默认 50。
+ * @param phaseDeg 起始相位，0～360，默认 0。
+ * @return 0 表示成功；非 0 表示通道、参数超出范围或通信失败。
+ * @n 正在播放时写入会立即改变这一路的参数，相位累加器不重置。要从头播放，再调用 startWaveform()。
+ */
+int setWaveform(uint8_t channel, eWaveform_t type, float freqHz, float amplitude, float offset, float dutyPercent = 50, float phaseDeg = 0);
+
+/**
+ * @fn writeCustomWave
+ * @brief 写入一路自定义波形的 256 个形状点。
+ * @param channel 通道编号，0～3 或 0～7。
+ * @param samples 256 个点。0 对应偏置减幅度，32768 对应偏置，65535 对应偏置加幅度。
+ * @return 0 表示成功；非 0 表示通道非法、指针为空或通信失败。
+ * @n 需先用 setWaveform() 把类型设为 eWaveformCustom。点数据掉电不保存。
+ */
+int writeCustomWave(uint8_t channel, const uint16_t samples[256]);
+
+/**
+ * @fn startWaveform
+ * @brief 按给定通道一起启动波形，相位同时清零。
+ * @param channels 通道编号数组，0～3 或 0～7，不允许重复。
+ * @param length 数组长度，1～通道数。
+ * @return 0 表示成功；非 0 表示通道非法、重复或通信失败。
+ * @n 两路配合的波形必须放在同一次调用里。单路可直接传通道号：startWaveform(0)。
+ */
+int startWaveform(const uint8_t channels[], uint8_t length);
+int startWaveform(uint8_t channel);
+
+/**
+ * @fn stopWaveform
+ * @brief 停止给定通道的波形，电压停在最后一拍。
+ * @param channels 通道编号数组，0～3 或 0～7，不允许重复。
+ * @param length 数组长度，1～通道数。
+ * @return 0 表示成功；非 0 表示通道非法、重复或通信失败。
+ * @n 不会回到 0 V。要全部归零，调用 stopOutput()。单路可直接传通道号：stopWaveform(0)。
+ */
+int stopWaveform(const uint8_t channels[], uint8_t length);
+int stopWaveform(uint8_t channel);
 
 /**
  * @fn readFirmwareVersion
@@ -248,6 +301,7 @@ uint16_t getStatus(void);
 - `setSyncChannelsVoltage`：多个指定通道同步更新。
 - `setAllChannelsVoltage`：全部通道同步更新。
 - `twoPointCalibration`：用万用表在 10% 和 90% 两点校准 CH0。
+- `setWaveform`：CH0 输出 10 Hz 正弦，CH0 与 CH1 同时启动。
 
 ## 兼容性
 
@@ -263,6 +317,7 @@ uint16_t getStatus(void);
 ## 历史
 
 - 2026/11/16 - V1.0.0 版本
+- 2026/11/20 - V1.1.0 版本，增加波形参数、自定义形状和同步启动/停止接口
 
 ## 创作者
 

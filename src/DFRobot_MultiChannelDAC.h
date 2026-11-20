@@ -6,8 +6,8 @@
  * @copyright   Copyright (c) 2026 DFRobot Co.Ltd (http://www.dfrobot.com)
  * @licence     The MIT License (MIT)
  * @author      wxzed (xiao.wu@dfrobot.com)
- * @version     V1.0.0
- * @date        2026-11-16
+ * @version     V1.1.0
+ * @date        2026-11-20
  * @url         https://github.com/DFRobot/DFRobot_MultiChannelDAC
  */
 #ifndef __DFROBOT_MULTICHANNELDAC_H
@@ -40,10 +40,20 @@
 #define DFR_MCDAC_HOLDING_CH8_RANGE       0x0012 ///< CH8 量程代码，写入后该通道先回 0 V
 #define DFR_MCDAC_HOLDING_CHANNEL_ENABLE  0x0013 ///< 通道启用位图，bit0=CH1…bit7=CH8
 #define DFR_MCDAC_HOLDING_COMMIT_MASK     0x0014 ///< 提交掩码，写入哪些位就让这些通道同时生效
-#define DFR_MCDAC_HOLDING_COMMAND         0x0015 ///< 命令：1=全部回 0 V，2=全部按暂存值同步生效
+#define DFR_MCDAC_HOLDING_COMMAND         0x0015 ///< 命令：1=全部停波形并回 0 V，2=全部按暂存值同步生效
+#define DFR_MCDAC_HOLDING_WAVE_COMMAND    0x0016 ///< 波形命令：1=按掩码启动，2=按掩码停止
+#define DFR_MCDAC_HOLDING_WAVE_MASK       0x0017 ///< 波形掩码，bit0=CH0
+#define DFR_MCDAC_HOLDING_WAVE_CHANNEL    0x0018 ///< 波形参数所属通道，0～7
+#define DFR_MCDAC_HOLDING_WAVE_BLOCK      0x0020 ///< 自定义波形块号，高 4 位通道，低 4 位块号
+#define DFR_MCDAC_HOLDING_WAVE_DATA       0x0021 ///< 当前块的 16 个形状点
 
-#define DFR_MCDAC_CMD_STOP_ALL            0x0001 ///< 命令值：全部通道同步回 0 V
+#define DFR_MCDAC_CMD_STOP_ALL            0x0001 ///< 命令值：全部通道停止波形并同步回 0 V
 #define DFR_MCDAC_CMD_COMMIT_ALL          0x0002 ///< 命令值：全部通道按暂存值同步生效
+#define DFR_MCDAC_WAVE_CMD_START          0x0001 ///< 波形命令：按掩码启动
+#define DFR_MCDAC_WAVE_CMD_STOP           0x0002 ///< 波形命令：按掩码停止，电压停在最后一拍
+#define DFR_MCDAC_WAVE_POINTS             256    ///< 自定义波形一个周期的点数
+#define DFR_MCDAC_WAVE_FREQ_MAX_HZ        5000   ///< 波形频率上限，单位 Hz
+#define DFR_MCDAC_RTU_WRITE_MAX           17     ///< 一帧最多写入的保持寄存器数，覆盖一块自定义波形
 
 #define DFR_MCDAC_I2C_ADDR_BASE           0x40   ///< I2C 从机地址基址，ADDR0/ADDR1 决定 0x40～0x43
 #define DFR_MCDAC_I2C_ADDR_MAX            0x43   ///< I2C 从机地址上限
@@ -60,6 +70,19 @@ typedef enum {
   eOutputRange5V = 1,   /**< 0～5 V，仅 DFR1332/DFR1333 */
   eOutputRange10V = 2   /**< 0～10 V，仅 DFR1328/DFR1329 */
 } eOutputRange_t;
+
+/**
+ * @enum eWaveform_t
+ * @brief 波形类型。幅度是峰值，输出范围是偏置减幅度到偏置加幅度。
+ */
+typedef enum {
+  eWaveformDc = 0,       /**< 直流，输出等于偏置 */
+  eWaveformSine = 1,     /**< 正弦 */
+  eWaveformSquare = 2,   /**< 方波，占空比有效 */
+  eWaveformTriangle = 3, /**< 三角 */
+  eWaveformSawtooth = 4, /**< 锯齿 */
+  eWaveformCustom = 5    /**< 自定义，使用 writeCustomWave() 写入的 256 点 */
+} eWaveform_t;
 
 /**
  * @class DFRobot_MultiChannelDAC
@@ -152,11 +175,67 @@ public:
   int setChannelEnabled(uint8_t channel, bool enabled);
 
   /**
-   * @brief 将全部通道同步设置为 0 V。
+   * @brief 将全部通道同步设置为 0 V，并停止全部波形。
    * @return 0 表示成功；非 0 表示通信失败。
    * @n 不改变量程和通道启用状态；后续调用 setVoltage() 或 setAllVoltage() 即可恢复输出。
    */
   int stopOutput(void);
+
+  /**
+   * @brief 写入一路波形参数，不启动播放。
+   * @param channel 通道编号，0～3 或 0～7，与 PCB 丝印一致。
+   * @param type 波形类型。
+   * @param freqHz 频率，单位 Hz，0～5000。0 表示停在当前相位。
+   * @param amplitude 峰值幅度，单位 V。直流波形不使用这个值。
+   * @param offset 偏置，单位 V。输出范围是偏置减幅度到偏置加幅度，必须落在当前量程内。
+   * @param dutyPercent 方波占空比，0～100，其他波形忽略。默认 50。
+   * @param phaseDeg 起始相位，0～360，默认 0。
+   * @return 0 表示成功；非 0 表示通道、参数超出范围或通信失败。
+   * @n 正在播放时写入会立即改变这一路的参数，相位累加器不重置。要从头播放，再调用 startWaveform()。
+   */
+  int setWaveform(uint8_t channel, eWaveform_t type, float freqHz, float amplitude, float offset,
+                  float dutyPercent = 50.0f, float phaseDeg = 0.0f);
+
+  /**
+   * @brief 写入一路自定义波形的 256 个形状点。
+   * @param channel 通道编号，0～3 或 0～7。
+   * @param samples 256 个点。0 对应偏置减幅度，32768 对应偏置，65535 对应偏置加幅度。
+   * @return 0 表示成功；非 0 表示通道非法、指针为空或通信失败。
+   * @n 需先用 setWaveform() 把类型设为 eWaveformCustom。点数据掉电不保存。
+   */
+  int writeCustomWave(uint8_t channel, const uint16_t samples[DFR_MCDAC_WAVE_POINTS]);
+
+  /**
+   * @brief 按给定通道一起启动波形，相位同时清零。
+   * @param channels 通道编号数组，0～3 或 0～7，不允许重复。
+   * @param length 数组长度，1～通道数。
+   * @return 0 表示成功；非 0 表示通道非法、重复或通信失败。
+   * @n 两路配合的波形必须放在同一次调用里。模块会检查每路的偏置和幅度是否落在量程内，任一不合格则都不启动。
+   */
+  int startWaveform(const uint8_t channels[], uint8_t length);
+
+  /**
+   * @brief 启动一路波形。
+   * @param channel 通道编号，0～3 或 0～7。
+   * @return 0 表示成功；非 0 表示通道非法或通信失败。
+   */
+  int startWaveform(uint8_t channel);
+
+  /**
+   * @brief 停止给定通道的波形，电压停在最后一拍。
+   * @param channels 通道编号数组，0～3 或 0～7，不允许重复。
+   * @param length 数组长度，1～通道数。
+   * @return 0 表示成功；非 0 表示通道非法、重复或通信失败。
+   * @n 不会回到 0 V。要全部归零，调用 stopOutput()。
+   */
+  int stopWaveform(const uint8_t channels[], uint8_t length);
+
+  /**
+   * @brief 停止一路波形，电压停在最后一拍。
+   * @param channel 通道编号，0～3 或 0～7。
+   * @return 0 表示成功；非 0 表示通道非法或通信失败。
+   */
+  int stopWaveform(uint8_t channel);
 
   /**
    * @brief 读取固件版本号。
@@ -217,6 +296,8 @@ protected:
   int readRegisterBlock(bool holding, uint16_t reg, uint16_t *values, uint8_t count);
   int writeRegisterBlock(uint16_t reg, const uint16_t *values, uint8_t count);
   int writeVoltageMv(uint8_t channel, uint16_t mv);
+  int waveformMask(const uint8_t channels[], uint8_t length, uint16_t *mask) const;
+  int waveformCommand(uint16_t command, const uint8_t channels[], uint8_t length);
   bool i2cProbe(uint8_t address);
   bool rangeSupported(uint8_t range) const;
   uint16_t rangeMaxMv(uint8_t range) const;

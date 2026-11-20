@@ -28,7 +28,7 @@ The DFRobot MultiChannel DAC modules use an on-board RP2040 to drive a DAC80504 
 - DFR1332: 4 channels, 0–2.5 V / 0–5 V
 - DFR1333: 8 channels, 0–2.5 V / 0–5 V
 
-Each channel can be set independently, enabled or disabled, and updated alone. Several channels or all channels can be updated synchronously with one commit.
+Each channel can be set independently, enabled or disabled, and updated alone. Several channels or all channels can be updated synchronously with one commit. Each channel can also output sine, square, triangle, sawtooth or a 256-point custom waveform, up to 5000 Hz.
 
 After uploading `setSingleChannelVoltage` to the host board, open the serial port at 115200 8N1:
 
@@ -174,11 +174,64 @@ int setChannelEnabled(uint8_t channel, bool enabled);
 
 /**
  * @fn stopOutput
- * @brief Set all channels to 0 V synchronously.
+ * @brief Set all channels to 0 V synchronously and stop every waveform.
  * @return 0 on success; non-zero on communication failure.
  * @n Range and enable state are unchanged. A later setVoltage() or setAllVoltage() restores output.
  */
 int stopOutput(void);
+
+/**
+ * @fn setWaveform
+ * @brief Write one channel's waveform parameters without starting playback.
+ * @param channel Channel number, 0–3 or 0–7, matching the PCB silkscreen.
+ * @param type Waveform type.
+ * - eWaveformDc: DC, output equals the offset.
+ * - eWaveformSine: sine.
+ * - eWaveformSquare: square, duty cycle applies.
+ * - eWaveformTriangle: triangle.
+ * - eWaveformSawtooth: sawtooth.
+ * - eWaveformCustom: custom, using the 256 points from writeCustomWave().
+ * @param freqHz Frequency in Hz, 0–5000. 0 holds the current phase.
+ * @param amplitude Peak amplitude in V. The output spans offset minus amplitude to offset plus amplitude and must stay inside the current range.
+ * @param offset Offset in V.
+ * @param dutyPercent Square-wave duty, 0–100. Ignored by other types. Default 50.
+ * @param phaseDeg Start phase, 0–360. Default 0.
+ * @return 0 on success; non-zero on an illegal channel or parameter, or communication failure.
+ * @n Writing while a channel is playing changes its parameters immediately and does not reset the phase accumulator. Call startWaveform() to restart from the beginning.
+ */
+int setWaveform(uint8_t channel, eWaveform_t type, float freqHz, float amplitude, float offset, float dutyPercent = 50, float phaseDeg = 0);
+
+/**
+ * @fn writeCustomWave
+ * @brief Write the 256 shape points of one custom waveform.
+ * @param channel Channel number, 0–3 or 0–7.
+ * @param samples 256 points. 0 is offset minus amplitude, 32768 is the offset, 65535 is offset plus amplitude.
+ * @return 0 on success; non-zero on an illegal channel, a null pointer or communication failure.
+ * @n Call setWaveform() with eWaveformCustom first. The points are not kept across power-off.
+ */
+int writeCustomWave(uint8_t channel, const uint16_t samples[256]);
+
+/**
+ * @fn startWaveform
+ * @brief Start the listed channels together and clear their phase at the same time.
+ * @param channels Channel array, 0–3 or 0–7, with no duplicates.
+ * @param length Array length, 1 to the channel count.
+ * @return 0 on success; non-zero on an illegal or duplicate channel, or communication failure.
+ * @n Waveforms that must stay aligned belong in one call. One channel can be started as startWaveform(0).
+ */
+int startWaveform(const uint8_t channels[], uint8_t length);
+int startWaveform(uint8_t channel);
+
+/**
+ * @fn stopWaveform
+ * @brief Stop the listed channels and hold the last sample.
+ * @param channels Channel array, 0–3 or 0–7, with no duplicates.
+ * @param length Array length, 1 to the channel count.
+ * @return 0 on success; non-zero on an illegal or duplicate channel, or communication failure.
+ * @n This does not return the output to 0 V. Call stopOutput() to zero every channel. One channel can be stopped as stopWaveform(0).
+ */
+int stopWaveform(const uint8_t channels[], uint8_t length);
+int stopWaveform(uint8_t channel);
 
 /**
  * @fn readFirmwareVersion
@@ -248,6 +301,7 @@ Channel numbers start at 0 and match the PCB silkscreen CH0–CH3 / CH0–CH7. `
 - `setSyncChannelsVoltage`: update several channels synchronously.
 - `setAllChannelsVoltage`: update all channels synchronously.
 - `twoPointCalibration`: use a multimeter to calibrate CH0 at 10 % and 90 % of full scale.
+- `setWaveform`: output a 10 Hz sine on CH0, and start CH0 and CH1 together.
 
 ## Compatibility
 
@@ -261,6 +315,7 @@ Channel numbers start at 0 and match the PCB silkscreen CH0–CH3 / CH0–CH7. `
 ## History
 
 - 2026/11/16 - V1.0.0 version
+- 2026/11/20 - V1.1.0 version. Adds waveform parameters, custom shapes, and synchronous start/stop.
 
 ## Credits
 
